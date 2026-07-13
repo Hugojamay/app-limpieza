@@ -17,13 +17,13 @@ st.title("📦 Control de Limpieza")
 # --- LÓGICA DE DATOS ---
 # Obtenemos todos los datos para extraer la lista de productos correctamente
 # Esto evita el KeyError al no depender de una columna inexistente antes de cargar
-data_inv = hoja_inv.get_all_records()
-df_inv = pd.DataFrame(data_inv)
+valores = hoja_inv.get_all_values()
+df_inv = pd.DataFrame(valores[1:], columns=valores[0])
 
 # Ahora lista_productos se extrae de la columna 'Nombre del producto'
 # (Verifica que en tu hoja 'Inventario' la columna se llame así exactamente)
+df_inv.columns = df_inv.columns.str.strip()
 lista_productos = df_inv['Nombre del producto'].tolist()
-
 # --- INTERFAZ ---
 tab1, tab2 = st.tabs(["🛒 Registrar Venta", "➕ Nuevo Producto"])
 
