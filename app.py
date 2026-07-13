@@ -14,12 +14,11 @@ hoja_reportes = sh.worksheet('Reportes')
 st.title("📦 Control de Limpieza")
 
 # --- LÓGICA DE DATOS ---
-# Leemos datos de inventario para validaciones
 valores = hoja_inv.get_all_values()
 df_inv = pd.DataFrame(valores[1:], columns=valores[0])
 df_inv.columns = df_inv.columns.str.strip()
-# Convertimos stock a numérico para poder comparar
-df_inv['Stock actual'] = pd.to_numeric(df_inv['Stock actual'])
+# Aseguramos que la columna sea numérica
+df_inv['Stock actual'] = pd.to_numeric(df_inv['Stock actual'], errors='coerce').fillna(0)
 lista_productos = df_inv['Nombre del producto'].tolist()
 
 # --- INTERFAZ ---
@@ -30,19 +29,23 @@ with tab1:
     cantidad = st.number_input("Litros vendidos", min_value=0.0)
     precio = st.number_input("Total Venta ($)", min_value=0.0)
     
-    # Mostrar stock actual como referencia
-    stock_disponible = df_inv.loc[df_inv['Nombre del producto'] == producto, 'Stock actual'].values[0]
-    st.info(f"Stock actual de {producto}: {stock_disponible} litros")
+    # --- FILTRO SEGURO PARA EL STOCK ---
+    filtro = df_inv[df_inv['Nombre del producto'] == producto]
+    
+    if not filtro.empty:
+        stock_disponible = float(filtro['Stock actual'].values[0])
+        st.info(f"Stock actual de {producto}: {stock_disponible} litros")
+    else:
+        stock_disponible = 0
+        st.warning("Producto no encontrado en inventario.")
 
     if st.button("Registrar Venta"):
-        # --- VALIDACIÓN ---
         if cantidad > stock_disponible:
             st.error(f"⚠️ ¡Cuidado! Solo tienes {stock_disponible} litros. No puedes vender {cantidad}.")
         elif cantidad <= 0:
             st.warning("La cantidad debe ser mayor a 0.")
         else:
             fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
-            # Registramos venta
             hoja_ventas.append_row([fecha, producto, cantidad, precio, 0.0])
             
             # Actualizamos stock
@@ -67,7 +70,9 @@ with tab2:
 
 with tab3:
     st.subheader("Resumen de Reportes")
-    # Leemos la hoja reportes y la mostramos
     data_rep = hoja_reportes.get_all_values()
-    df_rep = pd.DataFrame(data_rep[1:], columns=data_rep[0])
-    st.dataframe(df_rep)
+    if len(data_rep) > 0:
+        df_rep = pd.DataFrame(data_rep[1:], columns=data_rep[0])
+        st.dataframe(df_rep)
+    else:
+        st.write("No hay reportes disponibles.")
