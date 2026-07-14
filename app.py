@@ -71,21 +71,31 @@ with tab2:
 with tab3:
     st.subheader("📊 Reportes de Ventas")
     
-    # 1. Leer ventas y convertir fechas
+    # 1. Leer ventas y convertir datos
     data_ventas = hoja_ventas.get_all_values()
     df_v = pd.DataFrame(data_ventas[1:], columns=data_ventas[0])
-    df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
-    df_v['Cantidad'] = pd.to_numeric(df_v['Cantidad_Litros']) # Asegura que coincida con tu columna
     
-    # 2. Filtrar esta semana (desde el lunes)
+    # Asegurar formatos correctos
+    df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
+    df_v['Cantidad'] = pd.to_numeric(df_v['Cantidad_Litros'])
+    df_v['Precio'] = pd.to_numeric(df_v['Precio_Venta']) # Asegúrate que así se llame tu columna de dinero
+    
+    # 2. Filtrar esta semana
     hoy = datetime.now()
     inicio_semana = hoy - pd.Timedelta(days=hoy.weekday())
     df_semanal = df_v[df_v['Fecha'] >= inicio_semana]
     
-    # 3. Mostrar métricas
-    total_semanal = df_semanal['Cantidad'].sum()
-    st.metric("Total litros vendidos esta semana", f"{total_semanal:,.2f} L")
+    # 3. Mostrar métricas duales
+    col1, col2 = st.columns(2)
     
+    total_litros = df_semanal['Cantidad'].sum()
+    col1.metric("Litros semanales", f"{total_litros:,.2f} L")
+    
+    total_pesos = df_semanal['Precio'].sum()
+    col2.metric("Ventas semanales ($)", f"${total_pesos:,.2f}")
+    
+    # 4. Desglose detallado
+    st.write("---")
     st.write("Desglose por producto:")
-    resumen = df_semanal.groupby('Producto')['Cantidad'].sum().reset_index()
+    resumen = df_semanal.groupby('Producto').agg({'Cantidad': 'sum', 'Precio': 'sum'}).reset_index()
     st.table(resumen)
