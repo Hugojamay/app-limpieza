@@ -9,15 +9,15 @@ gc = gspread.service_account_from_dict(creds_dict)
 sh = gc.open('App-Limpieza-Inventario')
 hoja_inv = sh.worksheet('Inventario')
 hoja_ventas = sh.worksheet('Ventas')
-hoja_reportes = sh.worksheet('Reportes')
 
 st.title("📦 Control de Limpieza")
 
 # --- LÓGICA DE DATOS ---
+# Leemos datos de inventario
 valores = hoja_inv.get_all_values()
 df_inv = pd.DataFrame(valores[1:], columns=valores[0])
 df_inv.columns = df_inv.columns.str.strip()
-# Aseguramos que la columna sea numérica
+# Convertimos stock a numérico de forma segura
 df_inv['Stock actual'] = pd.to_numeric(df_inv['Stock actual'], errors='coerce').fillna(0)
 lista_productos = df_inv['Nombre del producto'].tolist()
 
@@ -29,23 +29,23 @@ with tab1:
     cantidad = st.number_input("Litros vendidos", min_value=0.0)
     precio = st.number_input("Total Venta ($)", min_value=0.0)
     
-    # --- FILTRO SEGURO PARA EL STOCK ---
+    # Filtro seguro para stock
     filtro = df_inv[df_inv['Nombre del producto'] == producto]
-    
     if not filtro.empty:
         stock_disponible = float(filtro['Stock actual'].values[0])
         st.info(f"Stock actual de {producto}: {stock_disponible} litros")
     else:
         stock_disponible = 0
-        st.warning("Producto no encontrado en inventario.")
+        st.warning("Producto no encontrado.")
 
     if st.button("Registrar Venta"):
         if cantidad > stock_disponible:
-            st.error(f"⚠️ ¡Cuidado! Solo tienes {stock_disponible} litros. No puedes vender {cantidad}.")
+            st.error(f"⚠️ ¡Cuidado! Solo tienes {stock_disponible} litros.")
         elif cantidad <= 0:
             st.warning("La cantidad debe ser mayor a 0.")
         else:
-            fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+            fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            # Registramos venta: Fecha, Producto, Cantidad, Precio, Ganancia
             hoja_ventas.append_row([fecha, producto, cantidad, precio, 0.0])
             
             # Actualizamos stock
@@ -69,10 +69,23 @@ with tab2:
         st.rerun()
 
 with tab3:
-    st.subheader("Resumen de Reportes")
-    data_rep = hoja_reportes.get_all_values()
-    if len(data_rep) > 0:
-        df_rep = pd.DataFrame(data_rep[1:], columns=data_rep[0])
-        st.dataframe(df_rep)
-    else:
-        st.write("No hay reportes disponibles.")
+    st.subheader("📊 Reportes de Ventas")
+    
+    # 1. Leer ventas y convertir fechas
+    data_ventas = hoja_ventas.get_all_values()
+    df_v = pd.DataFrame(data_ventas[1:], columns=data_ventas[0])
+    df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
+    df_v['Cantidad'] = pd.to_numeric(df_v['Cantidad_Litros']) # Asegura que coincida con tu columna
+    
+    # 2. Filtrar esta semana (desde el lunes)
+    hoy = datetime.now()
+    inicio_semana = hoy - pd.Timedelta(days=hoy.weekday())
+    df_semanal = df_v[df_v['Fecha'] >= inicio_semana]
+    
+    # 3. Mostrar métricas
+    total_semanal = df_semanal['Cantidad'].sum()
+    st.metric("Total litros vendidos esta semana", f"{total_semanal:,.2f} L")
+    
+    st.write("Desglose por producto:")
+    resumen = df_semanal.groupby('Producto')['Cantidad'].sum().reset_index()
+    st.table(resumen)
