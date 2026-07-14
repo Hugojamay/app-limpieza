@@ -13,7 +13,6 @@ hoja_ventas = sh.worksheet('Ventas')
 st.title("📦 Control de Limpieza")
 
 # --- LÓGICA DE DATOS ---
-# Leemos datos de inventario
 valores = hoja_inv.get_all_values()
 df_inv = pd.DataFrame(valores[1:], columns=valores[0])
 df_inv.columns = df_inv.columns.str.strip()
@@ -43,7 +42,6 @@ with tab1:
             st.warning("La cantidad debe ser mayor a 0.")
         else:
             fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            # Registramos venta: Fecha, Producto, Cantidad, Precio, Ganancia
             hoja_ventas.append_row([fecha, producto, cantidad, precio, 0.0])
             celda = hoja_inv.find(producto)
             hoja_inv.update_cell(celda.row, 3, stock_disponible - cantidad)
@@ -67,25 +65,22 @@ with tab3:
     st.subheader("📊 Reportes de Ventas")
     data_ventas = hoja_ventas.get_all_values()
     df_v = pd.DataFrame(data_ventas[1:], columns=data_ventas[0])
-    
-    # LIMPIEZA DE NOMBRES: Esto elimina espacios extra y asegura la lectura
     df_v.columns = df_v.columns.str.strip()
     
-    # CONVERSIÓN SEGURA: Usamos los nombres reales de tus columnas
-    # Si te da error, verifica que en la hoja 'Ventas' tus columnas se llamen exactamente así:
+    # --- CORRECCIÓN AQUÍ: Usamos los nombres exactos de tu hoja ---
     df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
-    df_v['Cantidad'] = pd.to_numeric(df_v['Cantidad']) 
-    df_v['Precio'] = pd.to_numeric(df_v['Precio'])
+    df_v['Cantidad_Litros'] = pd.to_numeric(df_v['Cantidad_Litros']) 
+    df_v['Total Venta'] = pd.to_numeric(df_v['Total Venta'])
     
     hoy = datetime.now()
     inicio_semana = hoy - pd.Timedelta(days=hoy.weekday())
     df_semanal = df_v[df_v['Fecha'] >= inicio_semana]
     
     col1, col2 = st.columns(2)
-    col1.metric("Litros semanales", f"{df_semanal['Cantidad'].sum():,.2f} L")
-    col2.metric("Ventas semanales ($)", f"${df_semanal['Precio'].sum():,.2f}")
+    col1.metric("Litros semanales", f"{df_semanal['Cantidad_Litros'].sum():,.2f} L")
+    col2.metric("Ventas semanales ($)", f"${df_semanal['Total Venta'].sum():,.2f}")
     
     st.write("---")
     st.write("Desglose por producto:")
-    resumen = df_semanal.groupby('Producto').agg({'Cantidad': 'sum', 'Precio': 'sum'}).reset_index()
+    resumen = df_semanal.groupby('Producto').agg({'Cantidad_Litros': 'sum', 'Total Venta': 'sum'}).reset_index()
     st.table(resumen)
