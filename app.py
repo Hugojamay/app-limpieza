@@ -17,7 +17,6 @@ st.title("📦 Control de Limpieza")
 valores = hoja_inv.get_all_values()
 df_inv = pd.DataFrame(valores[1:], columns=valores[0])
 df_inv.columns = df_inv.columns.str.strip()
-# Convertimos stock a numérico de forma segura
 df_inv['Stock actual'] = pd.to_numeric(df_inv['Stock actual'], errors='coerce').fillna(0)
 lista_productos = df_inv['Nombre del producto'].tolist()
 
@@ -29,7 +28,6 @@ with tab1:
     cantidad = st.number_input("Litros vendidos", min_value=0.0)
     precio = st.number_input("Total Venta ($)", min_value=0.0)
     
-    # Filtro seguro para stock
     filtro = df_inv[df_inv['Nombre del producto'] == producto]
     if not filtro.empty:
         stock_disponible = float(filtro['Stock actual'].values[0])
@@ -47,11 +45,8 @@ with tab1:
             fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             # Registramos venta: Fecha, Producto, Cantidad, Precio, Ganancia
             hoja_ventas.append_row([fecha, producto, cantidad, precio, 0.0])
-            
-            # Actualizamos stock
             celda = hoja_inv.find(producto)
             hoja_inv.update_cell(celda.row, 3, stock_disponible - cantidad)
-            
             st.success(f"¡Venta de {producto} registrada!")
             st.rerun()
 
@@ -70,31 +65,26 @@ with tab2:
 
 with tab3:
     st.subheader("📊 Reportes de Ventas")
-    
-    # 1. Leer ventas y convertir datos
     data_ventas = hoja_ventas.get_all_values()
     df_v = pd.DataFrame(data_ventas[1:], columns=data_ventas[0])
     
-    # Asegurar formatos correctos
-    df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
-    df_v['Cantidad'] = pd.to_numeric(df_v['Cantidad_Litros'])
-    df_v['Precio'] = pd.to_numeric(df_v['Precio_Venta']) # Asegúrate que así se llame tu columna de dinero
+    # LIMPIEZA DE NOMBRES: Esto elimina espacios extra y asegura la lectura
+    df_v.columns = df_v.columns.str.strip()
     
-    # 2. Filtrar esta semana
+    # CONVERSIÓN SEGURA: Usamos los nombres reales de tus columnas
+    # Si te da error, verifica que en la hoja 'Ventas' tus columnas se llamen exactamente así:
+    df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
+    df_v['Cantidad'] = pd.to_numeric(df_v['Cantidad']) 
+    df_v['Precio'] = pd.to_numeric(df_v['Precio'])
+    
     hoy = datetime.now()
     inicio_semana = hoy - pd.Timedelta(days=hoy.weekday())
     df_semanal = df_v[df_v['Fecha'] >= inicio_semana]
     
-    # 3. Mostrar métricas duales
     col1, col2 = st.columns(2)
+    col1.metric("Litros semanales", f"{df_semanal['Cantidad'].sum():,.2f} L")
+    col2.metric("Ventas semanales ($)", f"${df_semanal['Precio'].sum():,.2f}")
     
-    total_litros = df_semanal['Cantidad'].sum()
-    col1.metric("Litros semanales", f"{total_litros:,.2f} L")
-    
-    total_pesos = df_semanal['Precio'].sum()
-    col2.metric("Ventas semanales ($)", f"${total_pesos:,.2f}")
-    
-    # 4. Desglose detallado
     st.write("---")
     st.write("Desglose por producto:")
     resumen = df_semanal.groupby('Producto').agg({'Cantidad': 'sum', 'Precio': 'sum'}).reset_index()
