@@ -64,23 +64,34 @@ with tab2:
 with tab3:
     st.subheader("📊 Reportes de Ventas")
     data_ventas = hoja_ventas.get_all_values()
-    df_v = pd.DataFrame(data_ventas[1:], columns=data_ventas[0])
-    df_v.columns = df_v.columns.str.strip()
     
-    # --- CORRECCIÓN AQUÍ: Usamos los nombres exactos de tu hoja ---
-    df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True)
-    df_v['Cantidad_Litros'] = pd.to_numeric(df_v['Cantidad_Litros']) 
-    df_v['Total Venta'] = pd.to_numeric(df_v['Total Venta'])
-    
-    hoy = datetime.now()
-    inicio_semana = hoy - pd.Timedelta(days=hoy.weekday())
-    df_semanal = df_v[df_v['Fecha'] >= inicio_semana]
-    
-    col1, col2 = st.columns(2)
-    col1.metric("Litros semanales", f"{df_semanal['Cantidad_Litros'].sum():,.2f} L")
-    col2.metric("Ventas semanales ($)", f"${df_semanal['Total Venta'].sum():,.2f}")
-    
-    st.write("---")
-    st.write("Desglose por producto:")
-    resumen = df_semanal.groupby('Producto').agg({'Cantidad_Litros': 'sum', 'Total Venta': 'sum'}).reset_index()
-    st.table(resumen)
+    # --- CORRECCIÓN SEGURA ---
+    if len(data_ventas) > 1:
+        df_v = pd.DataFrame(data_ventas[1:], columns=data_ventas[0])
+        df_v.columns = df_v.columns.str.strip()
+        
+        # Procesamiento seguro de datos sin afectar el archivo original
+        df_v['Fecha'] = pd.to_datetime(df_v['Fecha'], dayfirst=True, errors='coerce')
+        df_v['Cantidad_Litros'] = pd.to_numeric(df_v['Cantidad_Litros'], errors='coerce').fillna(0)
+        df_v['Total Venta'] = pd.to_numeric(df_v['Total Venta'], errors='coerce').fillna(0)
+        
+        # Filtramos filas donde la fecha no fue válida para evitar errores en el tiempo
+        df_v = df_v.dropna(subset=['Fecha'])
+        
+        hoy = datetime.now()
+        inicio_semana = hoy - pd.Timedelta(days=hoy.weekday())
+        df_semanal = df_v[df_v['Fecha'] >= inicio_semana]
+        
+        if not df_semanal.empty:
+            col1, col2 = st.columns(2)
+            col1.metric("Litros semanales", f"{df_semanal['Cantidad_Litros'].sum():,.2f} L")
+            col2.metric("Ventas semanales ($)", f"${df_semanal['Total Venta'].sum():,.2f}")
+            
+            st.write("---")
+            st.write("Desglose por producto:")
+            resumen = df_semanal.groupby('Producto').agg({'Cantidad_Litros': 'sum', 'Total Venta': 'sum'}).reset_index()
+            st.table(resumen)
+        else:
+            st.info("No hay ventas registradas en la semana actual.")
+    else:
+        st.info("La hoja de ventas está vacía.")
